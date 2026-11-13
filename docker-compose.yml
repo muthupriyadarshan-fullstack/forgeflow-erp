@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forgeflow_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment:
+      APP_ENV: production
+      APP_DEBUG: 'false'
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: forgeflow_erp
+      DB_USERNAME: forgeflow_user
+      DB_PASSWORD: ForgeFlowSecretPassword123!
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      SESSION_DRIVER: redis
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - forgeflow_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: forgeflow_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+    networks:
+      - forgeflow_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: forgeflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: forgeflow_erp
+      POSTGRES_USER: forgeflow_user
+      POSTGRES_PASSWORD: ForgeFlowSecretPassword123!
+    ports:
+      - "5432:5432"
+    volumes:
+      - forgeflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeflow_user -d forgeflow_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - forgeflow_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: forgeflow_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - forgeflow_redisdata:/data
+    networks:
+      - forgeflow_net
+
+  queue-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forgeflow_worker
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan horizon
+    depends_on:
+      - app
+      - redis
+      - postgres
+    networks:
+      - forgeflow_net
+
+networks:
+  forgeflow_net:
+    driver: bridge
+
+volumes:
+  forgeflow_pgdata:
+  forgeflow_redisdata:

@@ -1,0 +1,228 @@
+openapi: 3.0.3
+info:
+  title: ForgeFlow Industrial Manufacturing ERP API
+  version: 1.0.0
+  description: |
+    Enterprise RESTful API for ForgeFlow Manufacturing ERP.
+    Handles double-entry stock ledgers, multi-level BOM explosion, purchase order approvals, GRN verification, and work orders.
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local Development / Docker Environment
+paths:
+  /auth/login:
+    post:
+      summary: User Login & Token Issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: admin@forgeflow.in
+                password:
+                  type: string
+                  example: Password123!
+      responses:
+        '200':
+          description: Sanctum bearer token and user role data
+  /dashboard:
+    get:
+      summary: Get Plant KPIs & Metrics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Real-time manufacturing metrics, low-stock alerts, monthly trends
+  /products:
+    get:
+      summary: List Products & Raw Materials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [raw_material, work_in_progress, finished_good, consumable]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated product list
+  /boms/{id}/explode:
+    get:
+      summary: Recursively Explode Bill of Materials
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: quantity
+          in: query
+          schema:
+            type: number
+            default: 1.0
+      responses:
+        '200':
+          description: Exploded component tree with gross scrap allowances and material cost
+  /inventory/balances:
+    get:
+      summary: Get Inventory Balances by Warehouse and Bin
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Location-level stock balances with moving average cost
+  /inventory/movements:
+    get:
+      summary: Immutable Stock Movement Ledger
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Double-entry audit ledger movements
+  /inventory/transfer:
+    post:
+      summary: Relocate Stock Between Warehouses
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, source_warehouse_id, dest_warehouse_id, quantity, unit_id]
+              properties:
+                product_id: { type: integer }
+                source_warehouse_id: { type: integer }
+                dest_warehouse_id: { type: integer }
+                quantity: { type: number }
+                unit_id: { type: integer }
+                reason: { type: string }
+      responses:
+        '201':
+          description: Atomic transfer executed and recorded
+  /inventory/adjust:
+    post:
+      summary: Adjust Physical Stock Balance
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, warehouse_id, quantity, unit_id, reason]
+              properties:
+                product_id: { type: integer }
+                warehouse_id: { type: integer }
+                quantity: { type: number }
+                unit_id: { type: integer }
+                reason: { type: string }
+      responses:
+        '201':
+          description: Adjustment recorded with mandatory audit reason
+  /purchase/orders:
+    get:
+      summary: List Purchase Orders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Purchase order records with GST breakdown
+  /purchase/orders/{id}/approve:
+    post:
+      summary: Approve or Reject Purchase Order
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                comments: { type: string }
+      responses:
+        '200':
+          description: PO approval status updated
+  /purchase/orders/{id}/grn:
+    post:
+      summary: Process Goods Receipt Note (GRN)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delivery_challan_number, items]
+      responses:
+        '201':
+          description: Goods received, inventory credited, invoice generated
+  /production/orders:
+    get:
+      summary: List Production Orders
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of work orders and manufacturing stages
+  /production/orders/{id}/reserve:
+    post:
+      summary: Reserve Raw Materials for Production
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Materials reserved with row-locking
+  /production/orders/{id}/issue:
+    post:
+      summary: Issue Reserved Materials to Shop Floor
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Materials consumed from inventory
+  /production/orders/{id}/complete:
+    post:
+      summary: Complete Work Order & Stock Finished Goods
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity_produced, batch_number]
+              properties:
+                quantity_produced: { type: number }
+                quantity_rejected: { type: number }
+                quantity_scrapped: { type: number }
+                labour_cost: { type: number }
+                machine_cost: { type: number }
+                batch_number: { type: string }
+      responses:
+        '200':
+          description: Finished goods added to warehouse with batch number
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: SanctumToken
