@@ -49,3 +49,4 @@ RUN composer dump-autoload --optimize --no-dev \
 
 EXPOSE 9000
 CMD ["php-fpm"]
+

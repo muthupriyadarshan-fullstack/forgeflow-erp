@@ -55,3 +55,4 @@ ForgeFlow is structured into isolated domain services to keep business logic out
 - **Tax Identifiers**: 15-character GSTIN (e.g. `27AABCF1234F1Z5`), 10-character PAN, and Corporate Identification Numbers (CIN).
 - **Metric System**: MT (Metric Ton), KG (Kilogram), Metre, Litre, PCS.
 - **Classification**: Harmonized System of Nomenclature (HSN) codes assigned to all steel billets, alloy bars, hydraulic components, and gearboxes.
+

@@ -76,3 +76,4 @@ jobs:
 
       - name: Build Vite Assets
         run: npm run build
+
